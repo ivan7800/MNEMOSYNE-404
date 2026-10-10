@@ -1,0 +1,22 @@
+<!doctype html><html lang="es"><meta charset="utf-8"><title>MNEMOSYNE 404 — prueba no destructiva</title><body><pre id="result">RUNNING</pre><script type="module">
+import {openDatabase,listObjects,saveObject,deleteObject,listMemories,saveMemory,deleteMemory,addLink,listLinks} from '../app/db.js';
+const lines=[],stamp=new Date().toISOString(),suffix=crypto.randomUUID(),id=`it/custom-smoke-${suffix}`,memoryId=`smoke-${suffix}`;
+const check=(c,m)=>{if(!c)throw Error(m);lines.push('PASS '+m)};
+let db;
+try{
+ db=await openDatabase();check(db.objectStoreNames.contains('objects'),'almacén de objetos listo');
+ await saveObject(db,{id,roomId:'it',title:'Prueba temporal',description:'QA',slot:0,createdAt:stamp,updatedAt:stamp});
+ check((await listObjects(db)).some(o=>o.id===id),'crear y consultar objeto');
+ await saveObject(db,{id,roomId:'it',title:'Modificado',description:'QA',slot:1,createdAt:stamp,updatedAt:stamp});
+ check((await listObjects(db)).find(o=>o.id===id)?.title==='Modificado','editar objeto');
+ await saveMemory(db,{id:memoryId,title:'QA temporal',body:'Contenido de prueba',tags:[],createdAt:stamp,updatedAt:stamp});
+ await addLink(db,id,memoryId);check((await listLinks(db)).some(l=>l.objectId===id&&l.memoryId===memoryId),'crear vínculo');
+ await deleteObject(db,id);check(!(await listObjects(db)).some(o=>o.id===id),'eliminar objeto');
+ check(!(await listLinks(db)).some(l=>l.objectId===id),'eliminar vínculos del objeto');
+ check((await listMemories(db)).some(m=>m.id===memoryId),'conservar memoria tras borrar objeto');
+ await deleteMemory(db,memoryId);check(!(await listMemories(db)).some(m=>m.id===memoryId),'limpieza de memoria temporal');
+ db.close();db=await openDatabase();check(db.objectStoreNames.contains('objects'),'reapertura sin borrar la base');
+ document.getElementById('result').textContent=lines.join('\n')+'\nALL_PASS';
+}catch(e){document.getElementById('result').textContent=lines.join('\n')+'\nFAIL '+(e.stack||e));}
+finally{try{if(db){await deleteObject(db,id);await deleteMemory(db,memoryId);db.close();}}catch(e){console.error('Limpieza de datos temporales incompleta',e);}}
+</script></body></html>

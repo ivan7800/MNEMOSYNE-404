@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync,existsSync} from 'node:fs';
+import {resolve,dirname} from 'node:path';
+const root=resolve(import.meta.dirname,'..');
+const html=readFileSync(resolve(root,'index.html'),'utf8');
+const main=readFileSync(resolve(root,'app/main.js'),'utf8');
+const ids=new Set([...html.matchAll(/\bid="([\w-]+)"/g)].map(x=>x[1]));
+test('IDs HTML únicos',()=>{const all=[...html.matchAll(/\bid="([\w-]+)"/g)].map(x=>x[1]);assert.equal(new Set(all).size,all.length)});
+test('selectores DOM por ID usados en main existen',()=>{for(const [,id] of main.matchAll(/getElementById\(['"]([^'"]+)['"]\)/g))assert.ok(ids.has(id),`Falta #${id}`);});
+test('assets e imports relativos resuelven bajo subruta',()=>{for(const [,url] of html.matchAll(/(?:src|href)="(\.\/[^"#?]+)"/g))assert.ok(existsSync(resolve(root,url)),`Recurso inexistente ${url}`);for(const file of ['main','db','scene','backup','learning','rooms','experience','interchange']){const path=resolve(root,'app',file+'.js');const content=readFileSync(path,'utf8');for(const [,url] of content.matchAll(/\bfrom\s+['"](\.[^'"]+)['"]/g))assert.ok(existsSync(resolve(dirname(path),url)),`${file}: ${url}`);}});
