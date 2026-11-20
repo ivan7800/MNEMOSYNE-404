@@ -38,39 +38,65 @@ export async function inspectRestore(db,data){
  return analyzeRestore({memories,links,objects,reviews},data);
 }
 // Fusión protegida en una sola transacción, incluso si cambia la BD tras la inspección.
+// Planificación pura: nunca se sobrescriben IDs sin una sustitución explícita.
+export function planRestore(existing,data,mode='merge'){
+ if(!['merge','skip','replace'].includes(mode))throw Error('Modo inválido');
+ const counts=Object.fromEntries(['memories','links','objects','reviews'].map(k=>[k,0]));
+ if(mode==='replace')return {data,skipped:counts};
+ const audit=analyzeRestore(existing,data);
+ if(mode==='merge'){
+  if(Object.values(audit.collisions).some(Boolean)||audit.invalidLinks||audit.slotConflicts)
+   throw Error('Conflictos de importación: '+JSON.stringify(audit));
+  return {data,skipped:counts};
+ }
+ const existingIds=key=>new Set((existing[key]||[]).map(v=>key==='reviews'?v.memoryId:v.id));
+ const memories=(data.memories||[]).filter(m=>!existingIds('memories').has(m.id));
+ const availableMemories=new Set([...(existing.memories||[]),...memories].map(m=>m.id));
+ const objectIds=existingIds('objects');
+ const occupied=new Set((existing.objects||[]).map(o=>o.roomId+'/'+o.slot));
+ const objects=(data.objects||[]).filter(o=>{
+  const slot=o.roomId+'/'+o.slot;
+  if(objectIds.has(o.id)||occupied.has(slot))return false;
+  occupied.add(slot);objectIds.add(o.id);return true;
+ });
+ const availableObjects=new Set([...BUILTIN_IDS,...objectIds]);
+ const linkIds=existingIds('links');
+ const links=(data.links||[]).filter(l=>!linkIds.has(l.id)&&availableObjects.has(l.objectId)&&availableMemories.has(l.memoryId));
+ const reviewIds=existingIds('reviews');
+ const reviews=(data.reviews||[]).filter(r=>!reviewIds.has(r.memoryId)&&availableMemories.has(r.memoryId));
+ const result={memories,links,objects,reviews};
+ const skipped=Object.fromEntries(Object.keys(counts).map(k=>[k,(data[k]||[]).length-result[k].length]));
+ return {data:result,skipped};
+}
+// Una única transacción garantiza que importar datos no deja cambios parciales.
 export function restoreBackup(db,data,mode='merge'){
- if(!['merge','replace'].includes(mode))return Promise.reject(new Error('Modo inválido'));
+ if(!['merge','skip','replace'].includes(mode))return Promise.reject(new Error('Modo inválido'));
  return new Promise((resolve,reject)=>{
   const t=db.transaction(['memories','links','objects','reviews'],'readwrite');
   const stores={memories:t.objectStore('memories'),links:t.objectStore('links'),objects:t.objectStore('objects'),reviews:t.objectStore('reviews')};
-  let failure=null;
+  let failure=null,result=null;
   const fail=message=>{if(!failure){failure=new Error(message);try{t.abort();}catch{}}};
-  t.oncomplete=()=>resolve();
+  t.oncomplete=()=>resolve(result);
   t.onerror=()=>{if(!failure)failure=t.error||new Error('Error transaccional');};
   t.onabort=()=>reject(failure||t.error||new Error('Importación cancelada'));
-  const run=()=>{
-   if(mode==='replace'){
-    for(const store of Object.values(stores))store.clear();
-   }
-   for(const [key,store] of Object.entries(stores))for(const item of (data[key]||[]))store.add(item);
+  const run=(records,clear=false)=>{
+   if(clear)for(const store of Object.values(stores))store.clear();
+   for(const [key,store] of Object.entries(stores))
+    for(const item of (records[key]||[]))store.add(item);
   };
   if(mode==='replace'){
-   // Reemplazar se reserva para copias válidas y debe confirmarse en la interfaz que lo invoque.
-   run();return;
+   try{result=planRestore({},data,'replace');run(result.data,true);}catch(e){fail(e.message);}
+   return;
   }
   const snapshots={};let remaining=4;
   for(const [key,store] of Object.entries(stores)){
    const req=store.getAll();
-   req.onerror=()=>fail(`No se pudo inspeccionar ${key}`);
+   req.onerror=()=>fail('No se pudo inspeccionar '+key);
    req.onsuccess=()=>{
     if(failure)return;
     snapshots[key]=req.result;
     if(--remaining===0){
-     const audit=analyzeRestore(snapshots,data);
-     if(Object.values(audit.collisions).some(Boolean)||audit.invalidLinks||audit.slotConflicts){
-      fail(`Conflictos de importación: ${JSON.stringify(audit)}`);return;
-     }
-     try{run();}catch(e){fail(e.message);}
+     try{result=planRestore(snapshots,data,mode);run(result.data);}catch(e){fail(e.message);}
     }
    };
   }
