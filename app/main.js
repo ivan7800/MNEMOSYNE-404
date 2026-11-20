@@ -91,10 +91,11 @@ $('backup-file').addEventListener('change',async()=>{
   const mode=await chooseRestore(audit,data);
   if(!['merge','skip','replace'].includes(mode)){status('Importación cancelada; no se han modificado datos.');return;}
   if(mode==='replace'){
-   if(prompt('Se borrará la biblioteca local y se cargará este archivo. Escribe RESTAURAR para confirmar:')!=='RESTAURAR'){
-    status('Sustitución cancelada.');return;
-   }
+   // Ofrecer la copia ANTES de solicitar el consentimiento destructivo.
    await exportFreshBackup();
+   if(prompt('Se ha ofrecido la descarga de una copia de tu biblioteca actual. Comprueba que está guardada antes de continuar. Esta operación borrará los datos existentes. Escribe RESTAURAR para confirmar:')!=='RESTAURAR'){
+    status('Sustitución cancelada; la biblioteca no se ha modificado.');return;
+   }
   }
   const report=await restoreBackup(db,data,mode);await refresh();
   const skipped=Object.values(report?.skipped||{}).reduce((sum,n)=>sum+n,0);
