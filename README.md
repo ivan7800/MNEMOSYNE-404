@@ -1,3 +1,16 @@
+# MNEMOSYNE-404 — Estado BETA (QA en curso)
+
+Aplicación local-first con salas 3D/2D, memorias IndexedDB, aprendizaje e intercambio MD/JSON. **No está certificada como estable:** los conocimientos dependen del almacenamiento del navegador. Guarda copias periódicas y comprueba que se han descargado.
+
+**Arranque local:** ejecutar ABRIR_MNEMOSYNE.bat en Windows con Python 3, o `python3 INICIAR_SERVIDOR.py` en Linux. Se abre automáticamente un puerto libre en 127.0.0.1. Versión publicada: https://ivan7800.github.io/MNEMOSYNE-404/ (origen distinto al local: los datos no se comparten).
+
+**Copias:** Exportar JSON crea un respaldo completo desde IndexedDB. Importar JSON ofrece fusión sin conflictos, omisión de duplicados o sustitución completa (requiere confirmación adicional). Exportar conocimiento no preserva vínculos ni repasos. Las importaciones siguen limitadas a archivos de 8 MB.
+
+**Pruebas:** `node --test tests/*.test.mjs`; `python tests/e2e_local.py` después de instalar Playwright/Chromium. GitHub Actions ejecuta ambas. Consulta [QA de noviembre](docs/QA-NOV-2026.md) para alcance y límites.
+
+---
+
+## Historial anterior (documentación de fases)
 # MNEMOSYNE 404 — Fase 3 (0.2.0 Alpha)
 
 Palacio de memoria con mapa 3D WebGL nativo y alternativa 2D. Esta edición añade memorias locales persistentes. No requiere Internet.
