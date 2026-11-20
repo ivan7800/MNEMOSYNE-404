@@ -29,7 +29,9 @@ try:
             browser = pw.chromium.launch_persistent_context(profile, headless=True, **kwargs)
             page = browser.new_page()
             page_errors = []
+            page_console = []
             page.on('pageerror', lambda exc: page_errors.append(str(exc)))
+            page.on('console', lambda msg: page_console.append(msg.text))
             # Perfil temporal: crear una base v1 antes de cargar el módulo v3.
             page.goto(url + '/tests/e2e-fixture.html', wait_until='domcontentloaded', timeout=20000)
             migration = page.evaluate("""async () => {
@@ -64,7 +66,13 @@ try:
             }""")
             check(restore['rejected'] and restore['preserved'], 'Fusión rechaza colisión y conserva datos')
             page.goto(url + '/tests/browser-smoke.html', wait_until='domcontentloaded', timeout=20000)
-            page.wait_for_function("document.querySelector('#result').textContent.includes('ALL_PASS') || document.querySelector('#result').textContent.includes('FAIL')", timeout=20000)
+            try:
+                page.wait_for_function("document.querySelector('#result').textContent.includes('ALL_PASS') || document.querySelector('#result').textContent.includes('FAIL')", timeout=20000)
+            except PlaywrightError:
+                print('SMOKE DIAGNOSTICO:', page.locator('#result').inner_text(), flush=True)
+                print('ERRORES JAVASCRIPT:', page_errors, flush=True)
+                print('CONSOLA:', page_console[-12:], flush=True)
+                raise
             result = page.locator('#result').inner_text()
             check('ALL_PASS' in result, 'IndexedDB CRUD, vínculos y reapertura: ' + result.replace('\n', ' | '))
             page.goto(url, wait_until='domcontentloaded', timeout=20000)
