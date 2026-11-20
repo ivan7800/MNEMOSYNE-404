@@ -24,9 +24,14 @@ def check(ok, label):
 try:
     with tempfile.TemporaryDirectory(prefix='mnemosyne-e2e-') as profile:
         with sync_playwright() as pw:
-            browser_path = os.environ.get('CHROMIUM_PATH') or shutil.which('chromium') or shutil.which('google-chrome')
+            engine_name = os.environ.get('MNEMOSYNE_BROWSER', 'chromium')
+            if engine_name not in ('chromium', 'firefox', 'webkit'):
+                raise RuntimeError('Navegador no admitido: ' + engine_name)
+            engine = getattr(pw, engine_name)
+            browser_path = (os.environ.get('CHROMIUM_PATH') or shutil.which('chromium') or shutil.which('google-chrome')) if engine_name == 'chromium' else None
             kwargs = {'executable_path': browser_path} if browser_path else {}
-            browser = pw.chromium.launch_persistent_context(profile, headless=True, **kwargs)
+            browser = engine.launch_persistent_context(profile, headless=True, **kwargs)
+            print('NAVEGADOR:', engine_name, flush=True)
             page = browser.new_page()
             page_errors = []
             page_console = []
