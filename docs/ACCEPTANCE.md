@@ -1,20 +1,22 @@
-# Pruebas de aceptación — pendientes de ejecución
+# Pruebas de aceptación — MNEMOSYNE-404 candidato 1.0
 
-| ID | Acción | Resultado esperado | Estado |
-|---|---|---|---|
-| A01 | Abrir bajo servidor local | Arranca sin errores de consola | PENDING |
-| A02 | Abrir en `/MNEMOSYNE-404/` | Recursos cargados, no 404 | PENDING |
-| A03 | Seleccionar sala en 3D | Abre sala correcta | PENDING |
-| A04 | Cambiar a modo 2D sin WebGL | Misma información accesible | PENDING |
-| A05 | Crear/editar/borrar memoria | Cambios consistentes y confirmación | PENDING |
-| A06 | Recargar | Persistencia intacta | PENDING |
-| A07 | Buscar término | Resultados correctos y acceso directo | PENDING |
-| A08 | Exportar e importar copia | Restauración íntegra sin duplicados | PENDING |
-| A09 | Importar archivo inválido | Error seguro, datos preservados | PENDING |
-| A10 | Teclado y reduced-motion | Foco visible, acciones accesibles | PENDING |
-| A11 | Móvil | No hay controles inalcanzables | PENDING |
-| A12 | Datos maliciosos (XSS) | Se muestran como texto sin ejecución | PENDING |
-| A13 | Modo offline PWA | Funciona solo cuando se implemente | N/A hasta fase PWA |
-| A14 | 1000 memorias | Búsqueda utilizable sin bloqueo apreciable | PENDING |
+Este documento distingue **cobertura automatizada** de **validación manual**. La CI real es la fuente del resultado PASS/FAIL; un test escrito no supone que haya aprobado.
 
-**No se ha ejecutado ninguna de estas pruebas**: solo se ha completado la especificación.
+| ID | Criterio | Cobertura y evidencia |
+|---|---|---|
+| A01 | Inicio local sin excepciones | E2E en servidor Python y página principal |
+| A02 | Subruta GitHub Pages sin 404 | Integridad de recursos, despliegue Pages; revisar navegación pública |
+| A03 | Selección de sala y objetos 3D | Recorrido controlado en navegador; selección visual manual pendiente |
+| A04 | Mapa 2D utilizable | E2E selector de modo, cuatro salas y lista de objetos |
+| A05 | CRUD consistente | E2E guardar memoria y CRUD de objetos/vínculos |
+| A06 | Persistencia entre sesiones | E2E recarga y reapertura de IndexedDB |
+| A07 | Búsqueda y referencias | Tests unitarios, E2E filtro colección y lector Markdown |
+| A08 | Backup completo e importación | E2E 1.000 memorias, copia v3, skip y replace; copia real pendiente |
+| A09 | Rechazo de copia inválida | Tests unitarios; formularios reales en varios navegadores pendiente |
+| A10 | Accesibilidad teclado | Foco visible, WASD y botones táctiles; lector de pantalla manual pendiente |
+| A11 | Móvil | CSS responsive; ensayo en teléfono físico pendiente |
+| A12 | XSS | E2E Markdown con etiquetas maliciosas mostradas como texto |
+| A13 | PWA offline | E2E desconexión tras instalación del SW; instalación real pendiente |
+| A14 | Rendimiento | 10.000 notas en prueba pura y 1.000 en IndexedDB; carga prolongada pendiente |
+
+**No declarar STABLE** hasta aprobar todos los criterios manuales críticos. Ejecutar el workflow Quality de la rama/commit exactos y registrar su enlace en el informe de publicación.
