@@ -128,7 +128,7 @@ function chooseRestore(audit,data){
 $('backup-file').addEventListener('change',async()=>{
  const file=$('backup-file').files?.[0];if(!file)return;
  try{
-  if(file.size>8*1024*1024)throw Error('El archivo supera 8 MB.');
+  if(file.size>64*1024*1024)throw Error('El archivo supera 64 MB.');
   const data=validateBackup(await file.text());
   const audit=await inspectRestore(db,data);
   const mode=await chooseRestore(audit,data);
