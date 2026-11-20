@@ -1,7 +1,7 @@
 <!doctype html><html lang="es"><meta charset="utf-8"><title>MNEMOSYNE 404 — prueba no destructiva</title><body><pre id="result">RUNNING</pre><script type="module">
 import {openDatabase,listObjects,saveObject,deleteObject,listMemories,saveMemory,deleteMemory,addLink,listLinks} from '../app/db.js';
 const lines=[],stamp=new Date().toISOString(),suffix=crypto.randomUUID(),id=`it/custom-smoke-${suffix}`,memoryId=`smoke-${suffix}`;
-const check=(c,m)=>{if(!c)throw Error(m);lines.push('PASS '+m)};
+const check=(c,m)=>{if(!c)throw Error(m);lines.push('PASS '+m);document.getElementById('result').textContent=lines.join('\n')+'\nRUNNING';};
 let db;
 try{
  db=await openDatabase();check(db.objectStoreNames.contains('objects'),'almacén de objetos listo');
