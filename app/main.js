@@ -4,7 +4,7 @@ import {openDatabase,listMemories,saveMemory,saveMemoryWithLink,deleteMemory,lis
 import {nextReview,due,routeForRoom} from './learning.js';
 import {createBackup,validateBackup,downloadBackup} from './backup.js';
 import {exportKnowledge,parseKnowledgeJSON,parseMarkdown,prepareEntries} from './interchange.js';
-const $=id=>document.getElementById(id);let selected=null,selectedObject=null,mode='3d',scene=null,db=null,memories=[],links=[],editing=null,customObjects=[],objectEditing=null,reviews=[],learnQueue=[],learnIndex=0,learnMode="review";
+const $=id=>document.getElementById(id);let selected=null,selectedObject=null,mode='3d',scene=null,db=null,memories=[],links=[],editing=null,customObjects=[],objectEditing=null,reviews=[],learnQueue=[],learnIndex=0,learnMode="review";const PAGE_SIZE=60;let visibleCount=PAGE_SIZE,searchTimer=null;
 const objectsFor=room=>[...room.objects.map(o=>({...o,custom:false,slot:-1})),...customObjects.filter(o=>o.roomId===room.id).map(o=>({...o,custom:true}))];
 function el(tag,cls,txt){const n=document.createElement(tag);if(cls)n.className=cls;if(txt!==undefined)n.textContent=txt;return n;}
 function status(message){$('data-status').textContent=message;}
@@ -17,7 +17,35 @@ $('reset').addEventListener('click',()=>{scene?.reset();showRoom(null);$('status
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('editor').open&&!$('object-editor').open&&!$('learn-dialog').open){showRoom(null);$('status').textContent='De vuelta al vestíbulo';}});
 $('scene').addEventListener('mnemosyne:webgl-lost',()=>{setMode('2d');$('mode').disabled=true;$('mode').title='El contexto WebGL se ha perdido; recarga para reintentar';$('status').textContent='Se ha perdido el contexto WebGL: modo 2D disponible. Recarga para reintentar.';});
 try{scene=createScene($('scene'),showRoom);setMode('3d');}catch(err){console.warn('WebGL no disponible:',err);setMode('2d');$('mode').disabled=true;$('mode').title='WebGL no está disponible';$('status').textContent='WebGL no disponible: modo 2D activado';}
-function renderMemories(){const holder=$('memory-list');holder.replaceChildren();const query=$('search').value.toLocaleLowerCase('es').trim();let filtered=memories.filter(m=>[m.title,m.body,...m.tags].join(' ').toLocaleLowerCase('es').includes(query));if(selectedObject&&!query)filtered=filtered.filter(m=>links.some(l=>l.objectId===selectedObject&&l.memoryId===m.id));filtered.sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));$('library-stats').textContent=`${memories.length} memorias · ${links.length} vínculos · ${filtered.length} resultados`; $('link-memory').disabled=!selectedObject||!db;$('new-memory').disabled=!db;if(!filtered.length){holder.append(el('p','muted',selectedObject&&!query?'Este objeto todavía no tiene memorias vinculadas.':'No hay memorias que mostrar.'));return;}for(const m of filtered){const card=el('article','memory-card');card.append(el('strong','',m.title),el('small','',m.tags.join(' · ')||'Sin etiquetas'),el('p','',m.body));const actions=el('div','actions');const edit=el('button','','Editar');edit.type='button';edit.addEventListener('click',()=>openEditor(m));const del=el('button','','Eliminar');del.type='button';del.addEventListener('click',()=>remove(m));actions.append(edit,del);if(selectedObject){const associated=links.some(l=>l.objectId===selectedObject&&l.memoryId===m.id);const toggle=el('button','',associated?'Desvincular':'Vincular');toggle.type='button';toggle.addEventListener('click',async()=>{try{if(associated)await removeLink(db,selectedObject,m.id);else await addLink(db,selectedObject,m.id);await refresh();status(associated?'Memoria desvinculada.':'Memoria vinculada al objeto.');}catch(e){status(`Error de vinculación: ${e.message}`);}});actions.append(toggle);}card.append(actions);holder.append(card);}}
+function renderMemories(){
+ const holder=$('memory-list');holder.replaceChildren();
+ const query=$('search').value.toLocaleLowerCase('es').trim();
+ const associated=selectedObject?new Set(links.filter(l=>l.objectId===selectedObject).map(l=>l.memoryId)):null;
+ let filtered=memories.filter(m=>(query?[m.title,m.body,...m.tags].join(' ').toLocaleLowerCase('es').includes(query):!selectedObject||associated.has(m.id)));
+ filtered.sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
+ $('library-stats').textContent=memories.length+' memorias · '+links.length+' vínculos · '+filtered.length+' resultados';
+ $('link-memory').disabled=!selectedObject||!db;$('new-memory').disabled=!db;
+ $('more-memories').hidden=filtered.length<=visibleCount;
+ if(!filtered.length){holder.append(el('p','muted',selectedObject&&!query?'Este objeto todavía no tiene memorias vinculadas.':'No hay memorias que mostrar.'));return;}
+ for(const m of filtered.slice(0,visibleCount)){
+  const card=el('article','memory-card');
+  card.append(el('strong','',m.title),el('small','',m.tags.join(' · ')||'Sin etiquetas'),el('p','',m.body.length>320?m.body.slice(0,320)+'…':m.body));
+  const actions=el('div','actions'),edit=el('button','','Editar'),del=el('button','','Eliminar');
+  edit.type='button';edit.addEventListener('click',()=>openEditor(m));
+  del.type='button';del.addEventListener('click',()=>remove(m));actions.append(edit,del);
+  if(selectedObject){
+   const linked=associated.has(m.id),toggle=el('button','',linked?'Desvincular':'Vincular');
+   toggle.type='button';toggle.addEventListener('click',async()=>{
+    try{if(linked)await removeLink(db,selectedObject,m.id);else await addLink(db,selectedObject,m.id);
+     await refresh();status(linked?'Memoria desvinculada.':'Memoria vinculada al objeto.');
+    }catch(e){status('Error de vinculación: '+e.message);}
+   });actions.append(toggle);
+  }
+  card.append(actions);holder.append(card);
+ }
+}
+$('more-memories').addEventListener('click',()=>{visibleCount+=PAGE_SIZE;renderMemories();});
+
 async function refresh(){[memories,links,customObjects,reviews]=await Promise.all([listMemories(db),listLinks(db),listObjects(db),listReviews(db)]);renderReviewStats();if(selected)showRoomPreservingSelection();else renderMemories();scene?.updateObjects(customObjects);}
 function showRoomPreservingSelection(){const old=selectedObject;showRoom(selected);if(old){const buttons=[...$('object-list').querySelectorAll('button.object')];const room=rooms.find(r=>r.id===selected);const idx=objectsFor(room).findIndex(o=>objectKey(room.id,o.id)===old||o.id===old);if(idx>=0)buttons[idx].click();}}
 function openObjectEditor(obj=null){if(!db||!selected)return;const room=rooms.find(r=>r.id===selected);const used=new Set(customObjects.filter(o=>o.roomId===room.id&&o.id!==obj?.id).map(o=>o.slot));const slots=$('object-slot');slots.replaceChildren();for(let i=0;i<12;i++){if(used.has(i))continue;const option=el('option','',`Posición ${i+1}`);option.value=String(i);slots.append(option);}if(!slots.options.length){status('Esta sala ya tiene el máximo de 12 objetos personalizados.');return;}objectEditing=obj?.id||null;$('object-editor-title').textContent=obj?'Editar objeto':'Nuevo objeto';$('object-name').value=obj?.title||'';$('object-description').value=obj?.description||'';slots.value=String(obj?.slot??Number(slots.options[0].value));$('object-error').textContent='';$('object-editor').showModal();$('object-name').focus();}
@@ -25,28 +53,53 @@ $('new-object').addEventListener('click',()=>openObjectEditor());$('cancel-objec
 $('object-form').addEventListener('submit',async e=>{e.preventDefault();if(!db||!selected)return;const title=$('object-name').value.trim(),description=$('object-description').value.trim(),slot=Number($('object-slot').value);if(!title||title.length>80||description.length>500||!Number.isInteger(slot)||slot<0||slot>11){$('object-error').textContent='Nombre o posición inválidos.';return;}if(customObjects.some(o=>o.roomId===selected&&o.slot===slot&&o.id!==objectEditing)){$('object-error').textContent='La posición ya está ocupada.';return;}const old=customObjects.find(o=>o.id===objectEditing),now=new Date().toISOString();const obj={id:old?.id||`${selected}/custom-${crypto.randomUUID()}`,roomId:selected,title,description,slot,createdAt:old?.createdAt||now,updatedAt:now};try{await saveObject(db,obj);await refresh();$('object-editor').close();status(old?'Objeto actualizado.':'Objeto creado y guardado.');}catch(err){$('object-error').textContent=err.message;}});
 async function removeObject(obj){if(!confirm(`¿Eliminar «${obj.title}»? Se eliminarán sus vínculos, pero no las memorias.`))return;try{await deleteObject(db,obj.id);selectedObject=null;await refresh();status('Objeto eliminado. Sus memorias se han conservado.');}catch(e){status(`Error al eliminar: ${e.message}`);}}
 function openEditor(memory=null){if(!db){status('Almacenamiento no disponible.');return;}editing=memory?.id||null;$('editor-title').textContent=memory?'Editar memoria':'Nueva memoria';$('memory-title').value=memory?.title||'';$('memory-body').value=memory?.body||'';$('memory-tags').value=memory?.tags.join(', ')||'';$('editor-error').textContent='';$('editor').showModal();$('memory-title').focus();}
-$('new-memory').addEventListener('click',()=>openEditor());$('cancel-edit').addEventListener('click',()=>$('editor').close());$('search').addEventListener('input',renderMemories);
-$('memory-form').addEventListener('submit',async e=>{e.preventDefault();if(!db)return;const title=$('memory-title').value.trim(),body=$('memory-body').value.trim(),tags=[...new Set($('memory-tags').value.split(',').map(v=>v.trim()).filter(Boolean))].slice(0,20);if(!title||!body){$('editor-error').textContent='Introduce título y contenido.';return;}if(title.length>120||body.length>40000||tags.some(t=>t.length>100)){$('editor-error').textContent='Máximo 120 caracteres de título, 40.000 de contenido y 100 por etiqueta.';return;}const old=memories.find(m=>m.id===editing);const now=new Date().toISOString();const memory={id:old?.id||crypto.randomUUID(),title,body,tags,createdAt:old?.createdAt||now,updatedAt:now};try{if(selectedObject&&!old)await saveMemoryWithLink(db,memory,selectedObject);else await saveMemory(db,memory);await refresh();$('editor').close();status(old?'Memoria actualizada y guardada.':'Memoria creada y guardada.');}catch(err){$('editor-error').textContent=`No se ha podido guardar: ${err.message}`;}});
+$('new-memory').addEventListener('click',()=>openEditor());$('cancel-edit').addEventListener('click',()=>$('editor').close());$('search').addEventListener('input',()=>{clearTimeout(searchTimer);visibleCount=PAGE_SIZE;searchTimer=setTimeout(renderMemories,150);});
+$('memory-form').addEventListener('submit',async e=>{e.preventDefault();if(!db)return;const title=$('memory-title').value.trim(),body=$('memory-body').value.trim(),tags=[...new Set($('memory-tags').value.split(',').map(v=>v.trim()).filter(Boolean))];if(!title||!body){$('editor-error').textContent='Introduce título y contenido.';return;}if(title.length>120||body.length>40000||tags.length>20||tags.some(t=>t.length>100)){$('editor-error').textContent='Máximo 120 caracteres de título, 40.000 de contenido, 20 etiquetas y 100 caracteres por etiqueta.';return;}const old=memories.find(m=>m.id===editing);const now=new Date().toISOString();const memory={id:old?.id||crypto.randomUUID(),title,body,tags,createdAt:old?.createdAt||now,updatedAt:now};try{if(selectedObject&&!old)await saveMemoryWithLink(db,memory,selectedObject);else await saveMemory(db,memory);await refresh();$('editor').close();status(old?'Memoria actualizada y guardada.':'Memoria creada y guardada.');}catch(err){$('editor-error').textContent=`No se ha podido guardar: ${err.message}`;}});
 async function remove(memory){if(!confirm(`¿Eliminar definitivamente «${memory.title}» y sus vínculos?`))return;try{await deleteMemory(db,memory.id);await refresh();status('Memoria eliminada.');}catch(e){status(`No se ha podido eliminar: ${e.message}`);}}
-$('link-memory').addEventListener('click',()=>{if(!selectedObject)return;$('search').value='';renderMemories();const names=memories.filter(m=>!links.some(l=>l.objectId===selectedObject&&l.memoryId===m.id));if(!names.length){status('Crea una memoria nueva para vincularla, o desvincula una existente.');return;}const holder=$('memory-list');holder.replaceChildren();holder.append(el('p','muted','Elige una memoria existente para vincular:'));for(const m of names){const b=el('button','object',m.title);b.type='button';b.addEventListener('click',async()=>{try{await addLink(db,selectedObject,m.id);await refresh();status('Memoria vinculada correctamente.');}catch(e){status(`Error: ${e.message}`);}});holder.append(b);}});
+$('link-memory').addEventListener('click',()=>{if(!selectedObject)return;$('search').value='';renderMemories();const names=memories.filter(m=>!links.some(l=>l.objectId===selectedObject&&l.memoryId===m.id));if(!names.length){status('Crea una memoria nueva para vincularla, o desvincula una existente.');return;}const holder=$('memory-list');holder.replaceChildren();$('more-memories').hidden=true;holder.append(el('p','muted','Elige una memoria existente para vincular:'));for(const m of names){const b=el('button','object',m.title);b.type='button';b.addEventListener('click',async()=>{try{await addLink(db,selectedObject,m.id);await refresh();status('Memoria vinculada correctamente.');}catch(e){status(`Error: ${e.message}`);}});holder.append(b);}});
 showRoom(null);(async()=>{try{db=await openDatabase();await refresh();status('Biblioteca local preparada · IndexedDB');}catch(e){console.error(e);status(`No se ha podido abrir IndexedDB: ${e.message}`);$('new-memory').disabled=true;$('link-memory').disabled=true;}})();
 
 
-// Copias portables: siempre validación previa, confirmación y transacción única.
-$('export-backup').addEventListener('click',()=>{if(!db){status('IndexedDB no disponible.');return;}try{downloadBackup(createBackup(memories,links,customObjects,reviews));status('Copia JSON generada. Guárdala en un lugar seguro.');}catch(e){status(`Exportación fallida: ${e.message}`);}});
+// Copias coherentes: leer IndexedDB de nuevo, no exportar vistas que puedan estar obsoletas.
+async function exportFreshBackup(){
+ const [storedMemories,storedLinks,storedObjects,storedReviews]=await Promise.all([listMemories(db),listLinks(db),listObjects(db),listReviews(db)]);
+ downloadBackup(createBackup(storedMemories,storedLinks,storedObjects,storedReviews));
+}
+$('export-backup').addEventListener('click',async()=>{
+ if(!db){status('IndexedDB no disponible.');return;}
+ try{await exportFreshBackup();status('Copia JSON generada con los datos actuales. Guárdala fuera del navegador.');}
+ catch(e){status('Exportación fallida: '+e.message);}
+});
 $('import-backup').addEventListener('click',()=>{if(!db){status('IndexedDB no disponible.');return;}$('backup-file').value='';$('backup-file').click();});
+function chooseRestore(audit,data){
+ const total=Object.values(audit.collisions).reduce((sum,n)=>sum+n,0);
+ const dialog=$('restore-dialog');
+ $('restore-summary').textContent='Copia validada: '+data.memories.length+' memorias, '+data.links.length+' vínculos, '+data.objects.length+' objetos y '+data.reviews.length+' repasos.';
+ $('restore-warnings').textContent=total+' IDs repetidos, '+audit.slotConflicts+' posiciones ocupadas y '+audit.invalidLinks+' vínculos sin destino. "Omitir" no sobrescribe; "Sustituir" elimina los datos actuales.';
+ $('restore-merge').disabled=Boolean(total||audit.slotConflicts||audit.invalidLinks);
+ return new Promise(resolve=>{
+  dialog.addEventListener('close',()=>resolve(dialog.returnValue||'cancel'),{once:true});
+  dialog.showModal();
+ });
+}
 $('backup-file').addEventListener('change',async()=>{
  const file=$('backup-file').files?.[0];if(!file)return;
  try{
   if(file.size>8*1024*1024)throw Error('El archivo supera 8 MB.');
   const data=validateBackup(await file.text());
   const audit=await inspectRestore(db,data);
-  const total=Object.values(audit.collisions).reduce((sum,n)=>sum+n,0);
-  if(audit.invalidLinks||audit.slotConflicts||total)throw Error(`No se importó nada: ${total} IDs existentes, ${audit.invalidLinks} vínculos sin objeto y ${audit.slotConflicts} posiciones ocupadas. Exporta una copia y resuelve los conflictos antes de reintentar.`);
-  const mode=confirm(`Copia válida: ${data.memories.length} memorias, ${data.links.length} vínculos, ${data.objects.length} objetos y ${data.reviews.length} repasos. No se han detectado conflictos.\n\nAceptar: añadir sin sobrescribir datos existentes.\nCancelar: no importar.`)?'merge':null;
-  if(!mode){status('Importación cancelada; no se han modificado datos.');return;}
-  await restoreBackup(db,data,mode);await refresh();status(`Importadas ${data.memories.length} memorias, ${data.links.length} vínculos y ${data.objects.length} objetos y ${data.reviews.length} repasos.`);
- }catch(e){status(`Importación rechazada: ${e.message}`);}
+  const mode=await chooseRestore(audit,data);
+  if(!['merge','skip','replace'].includes(mode)){status('Importación cancelada; no se han modificado datos.');return;}
+  if(mode==='replace'){
+   if(prompt('Se borrará la biblioteca local y se cargará este archivo. Escribe RESTAURAR para confirmar:')!=='RESTAURAR'){
+    status('Sustitución cancelada.');return;
+   }
+   await exportFreshBackup();
+  }
+  const report=await restoreBackup(db,data,mode);await refresh();
+  const skipped=Object.values(report?.skipped||{}).reduce((sum,n)=>sum+n,0);
+  status('Restauración completada ('+mode+'): '+report.data.memories.length+' memorias añadidas; '+skipped+' registros omitidos. '+(mode==='replace'?'La biblioteca anterior ha sido sustituida.':'Los registros existentes se han conservado.'));
+ }catch(e){status('Importación rechazada: '+e.message);}
 });
 
 function renderReviewStats(){const pending=due(memories,reviews).length;$('review-stats').textContent=`${pending} memorias pendientes de repaso · ${reviews.length} con seguimiento`;$('start-review').disabled=!db||!pending;$('start-route').disabled=!db||!selected||!routeForRoom(selected,links,memories).length;}
