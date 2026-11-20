@@ -1,0 +1,34 @@
+<!doctype html><html lang="es"><meta charset="utf-8"><title>QA integral de conocimientos</title><body><pre id="result">RUNNING</pre><script type="module">
+import {openDatabase,restoreBackup,readSnapshot} from '../app/db.js';
+import {createBackup,validateBackup} from '../app/backup.js';
+import {searchMemories,renderMarkdownSafe,wikiTargets} from '../app/knowledge.js';
+const output=document.getElementById('result'),checks=[];
+const check=(value,label)=>{if(!value)throw Error(label);checks.push('PASS '+label);output.textContent=checks.join('\n')+'\nRUNNING';};
+let db;
+try{
+ db=await openDatabase();
+ const snapshot=await readSnapshot(db),time=new Date().toISOString();
+ const records=Array.from({length:1000},(_,i)=>({id:'load-qa-'+i,title:'Carga '+i,body:i===999?'[[Carga 1]]\n# Memoria especial':'Contenido '+i,tags:['qa'],collection:'Banco de pruebas',createdAt:time,updatedAt:time}));
+ const data={memories:records,links:[],objects:[],reviews:[]};
+ const start=performance.now();
+ await restoreBackup(db,data,'merge');
+ const after=await readSnapshot(db);
+ check(after.memories.length===snapshot.memories.length+1000,'Restauración de 1000 memorias en IndexedDB');
+ const found=searchMemories(after.memories,{query:'Memoria especial',collection:'Banco de pruebas'});
+ check(found.length===1&&found[0].id==='load-qa-999','Búsqueda precisa en biblioteca grande');
+ check(performance.now()-start<15000,'Rendimiento total de carga y búsqueda menor a 15 s');
+ const copy=validateBackup(JSON.stringify(createBackup(after.memories,after.links,after.objects,after.reviews)));
+ check(copy.memories.length===after.memories.length,'Copia completa validada');
+ const skipped=await restoreBackup(db,copy,'skip');
+ check(skipped.data.memories.length===0,'Restauración repetida omite duplicados');
+ await restoreBackup(db,copy,'replace');
+ const restored=await readSnapshot(db);
+ check(restored.memories.length===after.memories.length&&restored.memories.some(m=>m.id==='load-qa-999'),'Sustitución atómica conserva la biblioteca');
+ const md=renderMarkdownSafe('<img src=x onerror="window.__injected=1">\n**Seguro** [[Carga 1]]',()=>{});
+ const wrapper=document.createElement('div');wrapper.append(md);
+ check(!wrapper.querySelector('img')&&!window.__injected&&wrapper.textContent.includes('<img'),'Markdown malicioso permanece como texto');
+ check(wikiTargets('[[Carga 1]]').length===1,'Enlaces wiki disponibles');
+ output.textContent=checks.join('\n')+'\nALL_PASS';
+}catch(e){output.textContent=checks.join('\n')+'\nFAIL '+(e.stack||e);}
+finally{try{db?.close();}catch{}}
+</script></body></html>
