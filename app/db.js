@@ -2,6 +2,21 @@ const NAME='mnemosyne404', VERSION=3;
 export function openDatabase(){return new Promise((resolve,reject)=>{const req=indexedDB.open(NAME,VERSION);req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains('memories')){const memories=db.createObjectStore('memories',{keyPath:'id'});memories.createIndex('updatedAt','updatedAt');}if(!db.objectStoreNames.contains('links')){const links=db.createObjectStore('links',{keyPath:'id'});links.createIndex('objectId','objectId');links.createIndex('memoryId','memoryId');}if(!db.objectStoreNames.contains('reviews'))db.createObjectStore('reviews',{keyPath:'memoryId'});if(!db.objectStoreNames.contains('objects')){const objects=db.createObjectStore('objects',{keyPath:'id'});objects.createIndex('roomId','roomId');}};req.onsuccess=()=>{const connection=req.result;connection.onversionchange=()=>connection.close();resolve(connection);};req.onerror=()=>reject(req.error);req.onblocked=()=>reject(new Error('Base de datos bloqueada por otra pestaña.'));});}
 function request(req){return new Promise((resolve,reject)=>{req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});}
 export function listMemories(db){return request(db.transaction('memories','readonly').objectStore('memories').getAll());}
+// Coherent snapshot: all four stores are read in one IndexedDB transaction.
+export function readSnapshot(db){
+ return new Promise((resolve,reject)=>{
+  const names=['memories','links','objects','reviews'],data={};
+  const t=db.transaction(names,'readonly');
+  t.oncomplete=()=>resolve(data);
+  t.onerror=()=>reject(t.error||Error('Error al leer copia'));
+  t.onabort=()=>reject(t.error||Error('Lectura de copia abortada'));
+  for(const name of names){
+   const r=t.objectStore(name).getAll();
+   r.onsuccess=()=>{data[name]=r.result;};
+  }
+ });
+}
+
 export async function saveMemory(db,memory){await tx(db,'memories','readwrite',t=>t.objectStore('memories').put(memory));}
 export async function deleteMemory(db,id){await tx(db,['memories','links','reviews'],'readwrite',t=>{t.objectStore('memories').delete(id);t.objectStore('reviews').delete(id);t.objectStore('links').index('memoryId').openCursor(IDBKeyRange.only(id)).onsuccess=e=>{const c=e.target.result;if(c){c.delete();c.continue();}};});}
 export function listLinks(db){return request(db.transaction('links','readonly').objectStore('links').getAll());}
