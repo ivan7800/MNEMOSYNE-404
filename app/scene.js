@@ -12,7 +12,27 @@ function cameraView(x,z,heading){
 function dot(a,b){return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]}function cross(a,b){return [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]]}function norm(v){const l=Math.hypot(...v)||1;return v.map(n=>n/l)}
 function cube(vertices,colors,x,y,z,w,h,d,c){const corners=[[x-w/2,y-h/2,z-d/2],[x+w/2,y-h/2,z-d/2],[x+w/2,y+h/2,z-d/2],[x-w/2,y+h/2,z-d/2],[x-w/2,y-h/2,z+d/2],[x+w/2,y-h/2,z+d/2],[x+w/2,y+h/2,z+d/2],[x-w/2,y+h/2,z+d/2]];const faces=[[0,1,2,3,.75],[5,4,7,6,.62],[4,0,3,7,.57],[1,5,6,2,.8],[3,2,6,7,1],[4,5,1,0,.42]];for(const [a,b,q,d2,shade] of faces){for(const idx of [a,b,q,a,q,d2]){vertices.push(...corners[idx]);colors.push(...c.map(v=>v*shade));}}}
 function mult(m,v){return [m[0]*v[0]+m[4]*v[1]+m[8]*v[2]+m[12]*v[3],m[1]*v[0]+m[5]*v[1]+m[9]*v[2]+m[13]*v[3],m[2]*v[0]+m[6]*v[1]+m[10]*v[2]+m[14]*v[3],m[3]*v[0]+m[7]*v[1]+m[11]*v[2]+m[15]*v[3]]}
-export function createScene(canvas,onSelect){const gl=canvas.getContext('webgl',{antialias:true,alpha:false});if(!gl)throw Error('WebGL no disponible');const p=gl.createProgram();gl.attachShader(p,compile(gl,gl.VERTEX_SHADER,VS));gl.attachShader(p,compile(gl,gl.FRAGMENT_SHADER,FS));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));gl.useProgram(p);const v=[],c=[];cube(v,c,0,-.32,0,11,.3,10,[.11,.24,.32]);for(const room of rooms){cube(v,c,room.x,.07,room.z,3.5,.28,3.05,room.color);cube(v,c,room.x,.42,room.z,.7,.53,.7,room.color.map(n=>Math.min(1,n*1.25)));for(const sx of [-1,1])cube(v,c,room.x+sx*1.53,.55,room.z, .12, .85, 3.12, [.19,.29,.39]);}
+export function createScene(canvas,onSelect){const gl=canvas.getContext('webgl',{antialias:true,alpha:false});if(!gl)throw Error('WebGL no disponible');const p=gl.createProgram();gl.attachShader(p,compile(gl,gl.VERTEX_SHADER,VS));gl.attachShader(p,compile(gl,gl.FRAGMENT_SHADER,FS));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));gl.useProgram(p);const v=[],c=[];
+cube(v,c,0,-.36,0,11,.25,10,[.10,.21,.29]);
+for(let n=-4;n<=4;n+=2){
+ cube(v,c,n,-.20,0,.026,.012,9.6,[.22,.42,.49]);
+ cube(v,c,0,-.20,n,.026,.012,9.6,[.22,.42,.49]);
+}
+for(const room of rooms){
+ const accent=room.color.map(n=>Math.min(1,n*1.2));
+ cube(v,c,room.x,.05,room.z,3.5,.27,3.05,room.color);
+ cube(v,c,room.x,.23,room.z,2.5,.08,2.2,[.09,.18,.26]);
+ cube(v,c,room.x,.49,room.z,.85,.54,.85,accent);
+ cube(v,c,room.x,.82,room.z,.38,.17,.38,[.76,.87,.94]);
+ for(const sx of [-1,1]){
+  cube(v,c,room.x+sx*1.53,.53,room.z,.14,.85,3.12,[.18,.30,.40]);
+  for(const sz of [-1,1]){
+   cube(v,c,room.x+sx*1.48,.66,room.z+sz*1.37,.22,1.12,.22,[.24,.39,.50]);
+   cube(v,c,room.x+sx*1.48,1.28,room.z+sz*1.37,.39,.13,.39,accent);
+  }
+ }
+}
+
 let vert=new Float32Array(v),col=new Float32Array(c);function buffer(attr,data){const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);const loc=gl.getAttribLocation(p,attr);gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,3,gl.FLOAT,false,0,0);}const baseVertices=v.slice(),baseColors=c.slice();let buffers=[];function updateObjects(objects=[]){const vertices=baseVertices.slice(),colors=baseColors.slice();for(const o of objects){const room=rooms.find(r=>r.id===o.roomId);if(!room)continue;const colr=room.color.map(k=>Math.min(1,k*1.25));const dx=(o.slot%4-1.5)*.65,dz=(Math.floor(o.slot/4)-1)*.65;cube(vertices,colors,room.x+dx,.68,room.z+dz,.3,.46,.3,colr);}vert=new Float32Array(vertices);col=new Float32Array(colors);for(const b of buffers)gl.deleteBuffer(b);buffers=[];buffer('position',vert);buffer('color',col);render();}buffer=function(attr,data){const b=gl.createBuffer();buffers.push(b);gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);const loc=gl.getAttribLocation(p,attr);gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,3,gl.FLOAT,false,0,0);};buffer('position',vert);buffer('color',col);gl.enable(gl.DEPTH_TEST);const uP=gl.getUniformLocation(p,'projection'),uV=gl.getUniformLocation(p,'view');let yaw=.7,pitch=.85,distance=14,selection=null,walk=false,walkX=0,walkZ=4.4,heading=Math.PI,quality='high';
 function nearestRoom(){return rooms.reduce((best,room)=>{const distance=Math.hypot(room.x-walkX,room.z-walkZ);return !best||distance<best.distance?{room,distance}:best;},null);}
 function moveWalk(action){
