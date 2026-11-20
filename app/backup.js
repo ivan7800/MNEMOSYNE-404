@@ -1,11 +1,11 @@
 // Formato portable y validación estricta antes de cualquier escritura.
 export const BACKUP_VERSION=3;
-const MAX_MEMORIES=10000, MAX_LINKS=50000, MAX_BYTES=8*1024*1024;
+const MAX_MEMORIES=10000, MAX_LINKS=50000, MAX_BYTES=64*1024*1024;
 const isObj=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const str=(v,max)=>typeof v==='string'&&v.length>0&&v.length<=max;
 export function createBackup(memories,links,objects=[],reviews=[]){return {format:'mnemosyne404-backup',schemaVersion:BACKUP_VERSION,exportedAt:new Date().toISOString(),memories,links,objects,reviews};}
 export function validateBackup(raw){
- if(typeof raw!=='string'||new Blob([raw]).size>MAX_BYTES)throw Error('Archivo demasiado grande (máximo 8 MB).');
+ if(typeof raw!=='string'||new Blob([raw]).size>MAX_BYTES)throw Error('Archivo demasiado grande (máximo 64 MB).');
  let obj;try{obj=JSON.parse(raw);}catch{throw Error('El archivo no contiene JSON válido.');}
  if(!isObj(obj)||obj.format!=='mnemosyne404-backup'||![1,2,BACKUP_VERSION].includes(obj.schemaVersion)||!Array.isArray(obj.memories)||!Array.isArray(obj.links))throw Error('Formato o versión de copia no compatibles.');
  if(obj.memories.length>MAX_MEMORIES||obj.links.length>MAX_LINKS)throw Error('La copia supera los límites de registros.');
