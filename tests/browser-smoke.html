@@ -17,6 +17,6 @@ try{
  await deleteMemory(db,memoryId);check(!(await listMemories(db)).some(m=>m.id===memoryId),'limpieza de memoria temporal');
  db.close();db=await openDatabase();check(db.objectStoreNames.contains('objects'),'reapertura sin borrar la base');
  document.getElementById('result').textContent=lines.join('\n')+'\nALL_PASS';
-}catch(e){document.getElementById('result').textContent=lines.join('\n')+'\nFAIL '+(e.stack||e));}
+}catch(e){document.getElementById('result').textContent=lines.join('\n')+'\nFAIL '+(e.stack||e);}
 finally{try{if(db){await deleteObject(db,id);await deleteMemory(db,memoryId);db.close();}}catch(e){console.error('Limpieza de datos temporales incompleta',e);}}
 </script></body></html>
