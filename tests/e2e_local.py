@@ -87,10 +87,18 @@ try:
             page.locator('#memory-title').fill('Prueba E2E')
             page.locator('#memory-body').fill('Contenido de la prueba')
             page.locator('#memory-form button[type=submit]').click()
+            try:
+                page.get_by_text('Prueba E2E', exact=True).wait_for(state='visible', timeout=10000)
+            except PlaywrightError:
+                print('EDITOR ERROR:', page.locator('#editor-error').inner_text(), flush=True)
+                print('DATA STATUS:', page.locator('#data-status').inner_text(), flush=True)
+                print('JS ERRORS:', page_errors, flush=True)
+                raise
             check(page.get_by_text('Prueba E2E', exact=True).count() > 0, 'Memoria creada')
             page.reload(wait_until='domcontentloaded')
             page.wait_for_function("document.querySelectorAll('#room-list button').length === 4", timeout=20000)
             page.get_by_placeholder('Título, contenido o etiquetas…').fill('Prueba E2E')
+            page.get_by_text('Prueba E2E', exact=True).wait_for(state='visible', timeout=10000)
             check(page.get_by_text('Prueba E2E', exact=True).count() > 0, 'Memoria persiste tras recargar')
             check(not page_errors, 'Sin excepciones JavaScript: ' + str(page_errors))
             browser.close()
