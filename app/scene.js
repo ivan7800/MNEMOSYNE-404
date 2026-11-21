@@ -3,11 +3,11 @@ const VS=`attribute vec3 position;attribute vec3 color;uniform mat4 projection;u
 const FS=`precision mediump float;varying vec3 vcolor;void main(){gl_FragColor=vec4(vcolor,1.0);}`;
 function compile(gl,type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s;}
 function perspective(fov,aspect,near,far){const f=1/Math.tan(fov/2),r=1/(near-far);return new Float32Array([f/aspect,0,0,0,0,f,0,0,0,0,(far+near)*r,-1,0,0,2*far*near*r,0]);}
-function viewMatrix(yaw,pitch,distance){const cp=Math.cos(pitch),sp=Math.sin(pitch),cy=Math.cos(yaw),sy=Math.sin(yaw);const eye=[distance*cp*sy,distance*sp,distance*cp*cy];const z=norm(eye),x=norm([z[2],0,-z[0]]),y=cross(z,x);return new Float32Array([x[0],x[1],x[2],0,y[0],y[1],y[2],0,z[0],z[1],z[2],0,-dot(x,eye),-dot(y,eye),-dot(z,eye),1]);}
+function viewMatrix(yaw,pitch,distance){const cp=Math.cos(pitch),sp=Math.sin(pitch),cy=Math.cos(yaw),sy=Math.sin(yaw);const eye=[distance*cp*sy,distance*sp,distance*cp*cy];const z=norm(eye),x=norm([z[2],0,-z[0]]),y=cross(z,x);return new Float32Array([x[0],y[0],z[0],0,x[1],y[1],z[1],0,x[2],y[2],z[2],0,-dot(x,eye),-dot(y,eye),-dot(z,eye),1]);}
 function cameraView(x,z,heading){
  const eye=[x,1.4,z],toward=[Math.sin(heading),-.16,Math.cos(heading)];
  const backward=norm(toward.map(n=>-n)),right=norm(cross([0,1,0],backward)),up=cross(backward,right);
- return new Float32Array([right[0],right[1],right[2],0,up[0],up[1],up[2],0,backward[0],backward[1],backward[2],0,-dot(right,eye),-dot(up,eye),-dot(backward,eye),1]);
+ return new Float32Array([right[0],up[0],backward[0],0,right[1],up[1],backward[1],0,right[2],up[2],backward[2],0,-dot(right,eye),-dot(up,eye),-dot(backward,eye),1]);
 }
 function dot(a,b){return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]}function cross(a,b){return [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]]}function norm(v){const l=Math.hypot(...v)||1;return v.map(n=>n/l)}
 function cube(vertices,colors,x,y,z,w,h,d,c){const corners=[[x-w/2,y-h/2,z-d/2],[x+w/2,y-h/2,z-d/2],[x+w/2,y+h/2,z-d/2],[x-w/2,y+h/2,z-d/2],[x-w/2,y-h/2,z+d/2],[x+w/2,y-h/2,z+d/2],[x+w/2,y+h/2,z+d/2],[x-w/2,y+h/2,z+d/2]];const faces=[[0,1,2,3,.75],[5,4,7,6,.62],[4,0,3,7,.57],[1,5,6,2,.8],[3,2,6,7,1],[4,5,1,0,.42]];for(const [a,b,q,d2,shade] of faces){for(const idx of [a,b,q,a,q,d2]){vertices.push(...corners[idx]);colors.push(...c.map(v=>v*shade));}}}
