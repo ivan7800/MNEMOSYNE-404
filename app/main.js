@@ -18,8 +18,20 @@ function showRoom(id,focusObject=null){const room=rooms.find(r=>r.id===id);selec
  renderMemories();
 }
 for(const [i,room] of rooms.entries()){const b=el('button','room');b.type='button';b.dataset.room=room.id;const t=el('span','txt');t.append(el('strong','',room.title),el('small','',room.subtitle));b.append(el('span','index',String(i+1).padStart(2,'0')),t);b.addEventListener('click',()=>showRoom(room.id));$('room-list').append(b);const tile=el('button','tile');tile.type='button';tile.dataset.room=room.id;tile.append(el('span','number',String(i+1).padStart(2,'0')+' / ESTANCIA'),el('span','name',room.title),el('span','hint',room.subtitle));tile.addEventListener('click',()=>showRoom(room.id));$('map2d').append(tile);}
-function setMode(next){mode=next;$('scene').hidden=mode==='2d';$('map2d').hidden=mode!=='2d';$('mode').textContent=mode==='3d'?'Modo 2D':'Modo 3D';$('mode').setAttribute('aria-label',mode==='3d'?'Cambiar al mapa 2D':'Cambiar al palacio 3D');$('engine').textContent=mode==='3d'?'WebGL · Motor 3D':'Mapa accesible · 2D';$('instructions').textContent=mode==='3d'?'Arrastra para girar · Rueda para zoom · Pulsa una sala para explorar':'Selecciona una sala; usa Tab y Enter para navegar';$('walk').disabled=mode!=='3d'||!scene;$('walk-controls').hidden=mode!=='3d'||!walkMode;if(mode==='3d')scene?.render();}
-$('mode').addEventListener('click',()=>setMode(mode==='3d'?'2d':'3d'));
+function setMode(next){mode=next;$('scene').hidden=mode==='2d';$('map2d').hidden=mode!=='2d';$('mode').textContent=mode==='3d'?'Modo 2D':'Modo 3D';$('mode').setAttribute('aria-label',mode==='3d'?'Cambiar al mapa 2D':'Cambiar al palacio 3D');$('engine').textContent=mode==='3d'?'WebGL · Motor 3D':'Mapa accesible · 2D';$('instructions').textContent=mode==='3d'?'Arrastra para girar · Rueda para zoom · Pulsa una sala para explorar':'Selecciona una sala; usa Tab y Enter para navegar';$('walk').disabled=mode!=='3d'||!scene;$('walk-controls').hidden=mode!=='3d'||!walkMode;if(mode==='3d'&&scene){
+  // Un canvas que estaba display:none puede medir 0x0 hasta el próximo layout.
+  // Renderizamos tras el layout y al siguiente frame, no durante la transición.
+  requestAnimationFrame(()=>{if(mode!=='3d')return;scene.render();requestAnimationFrame(()=>{if(mode==='3d')scene.render();});});
+ }}
+$('mode').addEventListener('click',()=>{
+ const next=mode==='3d'?'2d':'3d';
+ setMode(next);
+ if(next==='3d'&&scene){
+  // También cubre cambios de tamaño del panel al salir del modo 2D.
+  const bounds=$('scene').getBoundingClientRect();
+  if(bounds.width<1||bounds.height<1)$('status').textContent='Preparando vista 3D…';
+ }
+});
 $('reset').addEventListener('click',()=>{walkMode=false;$('walk').textContent='Explorar a pie';$('walk-controls').hidden=true;scene?.reset();showRoom(null);$('status').textContent='Vista centrada · Vestíbulo';});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!document.querySelector('dialog[open]')){showRoom(null);$('status').textContent='De vuelta al vestíbulo';}});
 $('scene').addEventListener('mnemosyne:webgl-lost',()=>{setMode('2d');$('mode').disabled=true;$('mode').title='El contexto WebGL se ha perdido; recarga para reintentar';$('status').textContent='Se ha perdido el contexto WebGL: modo 2D disponible. Recarga para reintentar.';});
