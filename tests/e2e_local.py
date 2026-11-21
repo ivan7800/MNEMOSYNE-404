@@ -118,6 +118,20 @@ try:
             if page.locator('#mode').is_enabled() and page.locator('#map2d').is_visible():
                 page.locator('#mode').click()
             if page.locator('#walk').is_enabled():
+                # Regression: 2D -> 3D must actually draw visible geometry, not just expose a canvas.
+                page.wait_for_function("""() => {
+                    const c=document.querySelector('#scene');
+                    return !c.hidden && c.clientWidth>0 && c.clientHeight>0 && c.width>0 && c.height>0;
+                }""")
+                gl_pixels=page.locator('#scene').evaluate("""canvas => {
+                    const gl=canvas.getContext('webgl');
+                    const p=new Uint8Array(4),bg=new Uint8Array(4);
+                    gl.readPixels(Math.floor(canvas.width/2),Math.floor(canvas.height/2),1,1,gl.RGBA,gl.UNSIGNED_BYTE,p);
+                    gl.readPixels(1,1,1,1,gl.RGBA,gl.UNSIGNED_BYTE,bg);
+                    return {center:[...p],corner:[...bg],error:gl.getError()};
+                }""")
+                check(gl_pixels['error']==0, 'WebGL sin error al volver de 2D: '+str(gl_pixels))
+                check(gl_pixels['center']!=gl_pixels['corner'], '3D dibuja geometría visible tras alternar 2D/3D: '+str(gl_pixels))
                 page.locator('#walk').click()
                 check(page.locator('#walk-controls').is_visible(), 'Recorrido 3D y controles accesibles')
                 page.locator('#scene').press('w')
