@@ -132,6 +132,22 @@ try:
                 }""")
                 check(gl_pixels['error']==0, 'WebGL sin error al volver de 2D: '+str(gl_pixels))
                 check(gl_pixels['center']!=gl_pixels['corner'], '3D dibuja geometría visible tras alternar 2D/3D: '+str(gl_pixels))
+                for repeat in range(3):
+                    page.locator('#mode').click()
+                    check(page.locator('#map2d').is_visible(), 'Alternancia 3D -> 2D '+str(repeat+1))
+                    page.locator('#mode').click()
+                    page.wait_for_function("""() => {
+                        const c=document.querySelector('#scene');
+                        return !c.hidden && c.clientWidth>0 && c.clientHeight>0;
+                    }""")
+                    page.evaluate("""() => new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))""")
+                    pixels=page.locator('#scene').evaluate("""canvas => {
+                        const gl=canvas.getContext('webgl'),a=new Uint8Array(4),b=new Uint8Array(4);
+                        gl.readPixels(Math.floor(canvas.width/2),Math.floor(canvas.height/2),1,1,gl.RGBA,gl.UNSIGNED_BYTE,a);
+                        gl.readPixels(1,1,1,1,gl.RGBA,gl.UNSIGNED_BYTE,b);
+                        return {center:[...a],corner:[...b],error:gl.getError()};
+                    }""")
+                    check(pixels['error']==0 and pixels['center']!=pixels['corner'], 'Render 3D visible tras alternar '+str(repeat+1)+': '+str(pixels))
                 page.locator('#walk').click()
                 check(page.locator('#walk-controls').is_visible(), 'Recorrido 3D y controles accesibles')
                 page.locator('#scene').press('w')
