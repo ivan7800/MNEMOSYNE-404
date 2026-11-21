@@ -109,7 +109,7 @@ function openReader(memory){
 $('reader-close').addEventListener('click',()=>$('reader').close());
 function previewMemory(){
  const holder=$('memory-preview');holder.replaceChildren(renderMarkdownSafe($('memory-body').value,name=>{
-  const match=resolveWiki(name,memories);if(match){$('editor').close();openReader(match);}else $('editor-error').textContent='Referencia sin destino: '+name;
+  const match=resolveWiki(name,memories);if(match)openReader(match);else $('editor-error').textContent='Referencia sin destino: '+name;
  }));
 }
 $('preview-memory').addEventListener('click',()=>{
