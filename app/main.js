@@ -244,5 +244,24 @@ $('quality-select').addEventListener('change',()=>{scene?.setQuality($('quality-
 try{$('quality-select').value=localStorage.getItem('mnemosyne.quality')||'high';}catch{}
 scene?.setQuality($('quality-select').value);
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1')){
- window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(e=>console.warn('PWA sin registrar:',e)));
+ window.addEventListener('load',()=>{
+  const previouslyControlled=Boolean(navigator.serviceWorker.controller);
+  let updateHandled=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+   // If the old PWA served cached app code, reload once when the updated
+   // worker takes control. Never interrupt an open editor/restore dialog.
+   if(!previouslyControlled||updateHandled)return;
+   updateHandled=true;
+   if(document.querySelector('dialog[open]')){
+    status('Nueva versión disponible. Guarda tus cambios y recarga la página para actualizar el 3D.');
+    return;
+   }
+   try{
+    if(sessionStorage.getItem('mnemosyne.worker-reload-v2')==='1')return;
+    sessionStorage.setItem('mnemosyne.worker-reload-v2','1');
+   }catch{/* storage may be unavailable in private mode */}
+   location.reload();
+  });
+  navigator.serviceWorker.register('./sw.js').catch(e=>console.warn('PWA sin registrar:',e));
+ });
 }
