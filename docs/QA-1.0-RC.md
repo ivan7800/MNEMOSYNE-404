@@ -15,7 +15,7 @@
 ## CI automatizada
 
 - Node 22: sintaxis de módulos, contratos existentes y tests nuevos de colecciones, enlaces, aprendizaje, backups, PWA y 10.000 resultados en memoria.
-- Python 3.12 + Playwright 1.56: Chromium, Firefox y WebKit. Cada navegador usa perfil temporal y servidor local aleatorio. Chromium y Firefox realizan recarga offline; en WebKit Linux se verifica precaché y registro del service worker: Playwright falla internamente al intentar reload con set_offline. No se atribuye cobertura de desconexión WebKit.
+- Python 3.12 + Playwright 1.56: Chromium, Firefox y WebKit. Cada navegador usa perfil temporal y servidor local aleatorio. Chromium y Firefox realizan recarga offline; en WebKit Linux se comprueba el registro activo del service worker, pero se marca SKIP para la desconexión y para CacheStorage cuando el runner no permite verificarlo. Playwright falla internamente al intentar reload con set_offline. No se atribuye cobertura de desconexión WebKit.
 - Cobertura funcional: migración de base v1→v3; fusión que preserva datos existentes; CRUD; reapertura; cuatro salas; 2D; creación de memoria con colección; lector Markdown; enlaces wiki; tour 3D; PWA offline; importación de 1.000 registros; búsqueda; importación repetida sin sobrescrituras; sustitución desde copia; inyección HTML mostrada como texto.
 - Se comprueba la ejecución concreta en GitHub Actions antes de marcar la release como aprobada. La existencia del workflow por sí sola no equivale a PASS.
 
