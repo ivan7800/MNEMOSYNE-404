@@ -87,6 +87,11 @@ try:
             if page.locator('#mode').is_enabled() and not page.locator('#map2d').is_visible():
                 page.locator('#mode').click()
             check(page.locator('#map2d').is_visible(), 'Mapa 2D visible (modo manual o fallback WebGL)')
+            pos=page.locator('#map2d').evaluate("""element => {
+                const card=element.querySelector('.tile');
+                return card.getBoundingClientRect().top-element.getBoundingClientRect().top;
+            }""")
+            check(pos<150, 'Salas 2D accesibles sin gran espacio vacío: '+str(pos))
             page.locator('#room-list button').first.click()
             check(page.locator('#object-list button.object').count() > 0, 'Objetos de sala visibles')
             page.locator('#new-memory').click()
@@ -115,6 +120,15 @@ try:
             check(page.locator('#reader-content h3').count() == 1, 'Markdown renderizado como encabezado')
             check(page.locator('#reader-content .wiki-ref').count() == 1, 'Enlace wiki interactivo')
             page.locator('#reader-close').click()
+            page.locator('#memory-list button').filter(has_text='Editar').first.click()
+            page.locator('#memory-body').fill('Borrador sin guardar [[Prueba E2E]]')
+            page.locator('#preview-memory').click()
+            page.locator('#memory-preview .wiki-ref').first.click()
+            check(page.locator('#reader').evaluate('(el) => el.open'), 'Enlace en vista previa abre lector')
+            check(page.locator('#editor').evaluate('(el) => el.open'), 'Editor permanece abierto al consultar wiki')
+            page.locator('#reader-close').click()
+            check('Borrador sin guardar' in page.locator('#memory-body').input_value(), 'Borrador Markdown conservado')
+            page.locator('#cancel-edit').click()
             if page.locator('#mode').is_enabled() and page.locator('#map2d').is_visible():
                 page.locator('#mode').click()
             if page.locator('#walk').is_enabled():
