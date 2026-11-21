@@ -33,7 +33,7 @@ function appendInline(parent,text,onWiki){
  const re=/\[\[([^\]\r\n]{1,120})\]\]|\*\*([^*\r\n]+)\*\*/g;let from=0;let match;
  while((match=re.exec(text))){
   if(match.index>from)parent.append(document.createTextNode(text.slice(from,match.index)));
-  if(match[1]){const btn=document.createElement('button');btn.type='button';btn.className='wiki-ref';btn.textContent=match[1];btn.title='Abrir memoria relacionada';btn.addEventListener('click',()=>onWiki(match[1]));parent.append(btn);}
+  if(match[1]){const target=match[1];const btn=document.createElement('button');btn.type='button';btn.className='wiki-ref';btn.textContent=target;btn.title='Abrir memoria relacionada';btn.addEventListener('click',()=>onWiki(target));parent.append(btn);}
   else{const strong=document.createElement('strong');strong.textContent=match[2];parent.append(strong);}
   from=re.lastIndex;
  }
